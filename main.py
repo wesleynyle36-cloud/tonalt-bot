@@ -1,7 +1,7 @@
 import os
 import logging
 import json
-import asyncio
+import threading
 from datetime import datetime
 
 import firebase_admin
@@ -205,28 +205,24 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "✅ Withdrawal request submitted.\nYou’ll be notified once processed."
         )
-        
-# ================== FLASK + BOT TOGETHER ==================
+
+# ================== BOT RUNNER ==================
+def run_bot():
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CallbackQueryHandler(buttons))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, messages))
+    logging.info("🚀 TONalt bot running...")
+    # disable signal handling so it works in a thread
+    app.run_polling(close_loop=False, stop_signals=())
+
+# ================== FLASK SERVER ==================
 flask_app = Flask(__name__)
 
 @flask_app.route("/")
 def home():
     return "Bot is running!"
 
-async def main():
-    # Start the bot
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CallbackQueryHandler(buttons))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, messages))
-    logging.info("🚀 TONalt bot running...")
-
-    # Run bot polling in background
-    asyncio.create_task(app.run_polling(close_loop=False))
-
-    # Run Flask server (blocking call)
-    flask_app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
-
 if __name__ == "__main__":
-    asyncio.run(main())
-
+    threading.Thread(target=run_bot, daemon=True).start()
+    flask_app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
