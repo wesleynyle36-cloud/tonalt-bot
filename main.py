@@ -1,7 +1,7 @@
 import os
 import logging
 import json
-import threading
+import asyncio
 from datetime import datetime
 
 import firebase_admin
@@ -207,18 +207,6 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 # ================== BOT RUNNER ==================
-def run_bot():
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CallbackQueryHandler(buttons))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, messages))
-    logging.info("🚀 TONalt bot running...")
-    app.run_polling(close_loop=False)
-
-# ================== FLASK SERVER ==================
-import asyncio
-
-# ================== BOT RUNNER ==================
 async def run_bot():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
@@ -235,7 +223,6 @@ def home():
     return "Bot is running!"
 
 if __name__ == "__main__":
-    # Run bot in asyncio loop inside a thread-safe way
-    threading.Thread(target=lambda: asyncio.run(run_bot())).start()
+    loop = asyncio.get_event_loop()
+    loop.create_task(run_bot())
     flask_app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
-
