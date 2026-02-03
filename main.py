@@ -205,24 +205,28 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "✅ Withdrawal request submitted.\nYou’ll be notified once processed."
         )
-
-# ================== BOT RUNNER ==================
-async def run_bot():
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CallbackQueryHandler(buttons))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, messages))
-    logging.info("🚀 TONalt bot running...")
-    await app.run_polling(close_loop=False)
-
-# ================== FLASK SERVER ==================
+        
+# ================== FLASK + BOT TOGETHER ==================
 flask_app = Flask(__name__)
 
 @flask_app.route("/")
 def home():
     return "Bot is running!"
 
-if __name__ == "__main__":
-    loop = asyncio.get_event_loop()
-    loop.create_task(run_bot())
+async def main():
+    # Start the bot
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CallbackQueryHandler(buttons))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, messages))
+    logging.info("🚀 TONalt bot running...")
+
+    # Run bot polling in background
+    asyncio.create_task(app.run_polling(close_loop=False))
+
+    # Run Flask server (blocking call)
     flask_app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+
+if __name__ == "__main__":
+    asyncio.run(main())
+
