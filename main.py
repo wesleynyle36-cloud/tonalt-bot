@@ -1,6 +1,7 @@
 import os
 import logging
 import json
+import threading
 from datetime import datetime
 
 import firebase_admin
@@ -15,6 +16,7 @@ from telegram.ext import (
     ContextTypes,
     filters,
 )
+from flask import Flask
 from dotenv import load_dotenv
 
 # ================== LOAD ENV ==================
@@ -112,7 +114,6 @@ async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await q.message.reply_text("❌ User not found. Use /start")
         return
 
-    # ---------------- PAYMENT ----------------
     if q.data == "pay":
         if user["paid"]:
             await q.message.reply_text("✅ You’ve already paid! Other features unlocked.")
@@ -123,26 +124,22 @@ async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         return
 
-    # ---------------- LOCK IF NOT PAID ----------------
     if not user["paid"]:
         await q.message.reply_text("🔒 You must complete registration payment first.")
         return
 
-    # ---------------- BALANCE ----------------
     if q.data == "balance":
         await q.message.reply_text(
             f"💰 Balance: KES {user['balance']}\n"
             f"📈 Total Earnings: KES {user['earnings']}"
         )
 
-    # ---------------- REFERRALS ----------------
     elif q.data == "referrals":
         await q.message.reply_text(
             f"👥 Referrals: {user['ref_count']}\n\n"
             f"🔗 Your referral link:\n{user['ref_link']}"
         )
 
-    # ---------------- WITHDRAW ----------------
     elif q.data == "withdraw":
         if user["withdraw_pending"]:
             await q.message.reply_text("⏳ You already have a pending withdrawal.")
@@ -178,13 +175,11 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         amount = user["balance"] - PLATFORM_FEE
 
-        # lock withdrawal
         user_ref(uid).update({
             "withdraw_pending": True,
             "balance": 0
         })
 
-        # Save withdrawal history
         db.collection("withdrawals").add({
             "user_id": uid,
             "name": name,
@@ -196,7 +191,6 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "created_at": datetime.utcnow()
         })
 
-        # Notify admin
         await context.bot.send_message(
             ADMIN_CHAT_ID,
             f"🏦 WITHDRAWAL REQUEST\n\n"
@@ -212,14 +206,22 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "✅ Withdrawal request submitted.\nYou’ll be notified once processed."
         )
 
-# ================== MAIN ==================
-def main():
+# ================== BOT RUNNER ==================
+def run_bot():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(buttons))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, messages))
     logging.info("🚀 TONalt bot running...")
-    app.run_polling(close_loop=False)  # critical for Render
+    app.run_polling(close_loop=False)
+
+# ================== FLASK SERVER ==================
+flask_app = Flask(__name__)
+
+@flask_app.route("/")
+def home():
+    return "Bot is running!"
 
 if __name__ == "__main__":
-    main()
+    threading.Thread(target=run_bot).start()
+    flask_app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
