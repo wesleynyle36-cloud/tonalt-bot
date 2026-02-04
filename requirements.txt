@@ -1,6 +1,11 @@
-
+# Telegram bot with webhook support
 python-telegram-bot[webhooks]==20.7
-firebase-admin
-python-dotenv
 
+# Firebase Admin SDK
+firebase-admin==6.5.0
 
+# Environment variable loader
+python-dotenv==1.0.1
+
+# Optional: if you want Flask for health checks or other endpoints
+Flask==3.0.2
