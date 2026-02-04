@@ -1,4 +1,5 @@
 import os
+import json
 import threading
 from dotenv import load_dotenv
 from flask import Flask
@@ -23,11 +24,11 @@ DB_URL = os.getenv("FIREBASE_DB_URL")
 PAYMENT_LINK = os.getenv("PAYSTACK_PAYMENT_LINK")
 DRIVE_LINK = os.getenv("DRIVE_LINK")
 
-# ================= FIREBASE INIT =================
-cred = credentials.Certificate("firebase_key.json")
-firebase_admin.initialize_app(cred, {
-    "databaseURL": DB_URL
-})
+# ================= FIREBASE INIT (Option 2) =================
+firebase_json = os.getenv("FIREBASE_KEY_JSON")
+cred_dict = json.loads(firebase_json)   # parse JSON string from env var
+cred = credentials.Certificate(cred_dict)
+firebase_admin.initialize_app(cred, {"databaseURL": DB_URL})
 
 users_ref = db.reference("users")
 withdraw_ref = db.reference("withdrawals")
