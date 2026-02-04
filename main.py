@@ -1,7 +1,9 @@
 import os
 import json
-from flask import Flask, request
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from dotenv import load_dotenv
+from telegram import (
+    Update, InlineKeyboardButton, InlineKeyboardMarkup
+)
 from telegram.ext import (
     ApplicationBuilder, CommandHandler,
     CallbackQueryHandler, MessageHandler,
@@ -11,6 +13,8 @@ import firebase_admin
 from firebase_admin import credentials, db
 
 # ================= LOAD ENV =================
+load_dotenv()
+
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID"))
 BOT_USERNAME = os.getenv("BOT_USERNAME")
@@ -188,28 +192,17 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data.clear()
         await update.message.reply_text("✅ Withdrawal request sent. Await admin processing.")
 
-# ================= BUILD BOT APP =================
-application = ApplicationBuilder().token(BOT_TOKEN).build()
-application.add_handler(CommandHandler("start", start))
-application.add_handler(CallbackQueryHandler(callbacks))
-application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, messages))
-
-# ================= FLASK SERVER =================
-flask_app = Flask(__name__)
-
-@flask_app.route("/")
-def home():
-    return "Bot is running on Render!"
-
-@flask_app.route(f"/webhook/{BOT_TOKEN}", methods=["POST"])
-def webhook():
-    update = Update.de_json(request.get_json(force=True), application.bot)
-    application.update_queue.put_nowait(update)
-    return "ok"
-
+# ================= MAIN =================
 if __name__ == "__main__":
-    # 🔑 Start the bot dispatcher 
-    application.initialize() 
-    application.start()
-    flask_app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+    application = ApplicationBuilder().token(BOT_TOKEN).build()
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CallbackQueryHandler(callbacks))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, messages))
 
+    print("🚀 BOT RUNNING VIA WEBHOOK")
+    application.run_webhook(
+        listen="0.0.0.0",
+        port=int(os.environ.get("PORT", 5000)),
+        url_path=BOT_TOKEN,
+        webhook_url=f"https://tonalt-bot.onrender.com/{BOT_TOKEN}"
+    )
