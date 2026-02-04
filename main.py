@@ -1,11 +1,7 @@
 import os
 import json
-import threading
-from dotenv import load_dotenv
-from flask import Flask
-from telegram import (
-    Update, InlineKeyboardButton, InlineKeyboardMarkup
-)
+from flask import Flask, request
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder, CommandHandler,
     CallbackQueryHandler, MessageHandler,
@@ -15,8 +11,6 @@ import firebase_admin
 from firebase_admin import credentials, db
 
 # ================= LOAD ENV =================
-load_dotenv()
-
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID"))
 BOT_USERNAME = os.getenv("BOT_USERNAME")
@@ -24,14 +18,13 @@ DB_URL = os.getenv("FIREBASE_DB_URL")
 PAYMENT_LINK = os.getenv("PAYSTACK_PAYMENT_LINK")
 DRIVE_LINK = os.getenv("DRIVE_LINK")
 
-# ================= FIREBASE INIT (Option 2) =================
+# ================= FIREBASE INIT =================
 firebase_json = os.getenv("FIREBASE_KEY_JSON")
-cred_dict = json.loads(firebase_json)   # parse JSON string from env var
+cred_dict = json.loads(firebase_json)
 cred = credentials.Certificate(cred_dict)
 firebase_admin.initialize_app(cred, {"databaseURL": DB_URL})
 
 users_ref = db.reference("users")
-withdraw_ref = db.reference("withdrawals")
 
 # ================= HELPERS =================
 def get_or_create_user(uid, referrer=None):
@@ -41,7 +34,7 @@ def get_or_create_user(uid, referrer=None):
             "approved": False,
             "paid_link_opened": False,
             "email_sent": False,
-            "balance": 0,   # start at zero
+            "balance": 0,
             "referrals": 0,
             "referred_by": referrer
         })
@@ -195,14 +188,11 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data.clear()
         await update.message.reply_text("✅ Withdrawal request sent. Await admin processing.")
 
-# ================= BOT RUNNER =================
-def run_bot():
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CallbackQueryHandler(callbacks))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, messages))
-    print("🚀 BOT RUNNING")
-    app.run_polling(close_loop=False)
+# ================= BUILD BOT APP =================
+application = ApplicationBuilder().token(BOT_TOKEN).build()
+application.add_handler(CommandHandler("start", start))
+application.add_handler(CallbackQueryHandler(callbacks))
+application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, messages))
 
 # ================= FLASK SERVER =================
 flask_app = Flask(__name__)
@@ -211,12 +201,11 @@ flask_app = Flask(__name__)
 def home():
     return "Bot is running on Render!"
 
+@flask_app.route(f"/webhook/{BOT_TOKEN}", methods=["POST"])
+def webhook():
+    update = Update.de_json(request.get_json(force=True), application.bot)
+    application.update_queue.put_nowait(update)
+    return "ok"
+
 if __name__ == "__main__":
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CallbackQueryHandler(callbacks))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, messages))
-
-    print("🚀 BOT RUNNING")
-    app.run_polling()
-
+    flask_app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
