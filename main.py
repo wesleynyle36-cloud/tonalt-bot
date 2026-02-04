@@ -193,14 +193,9 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("✅ Withdrawal request sent. Await admin processing.")
 
 # ================= MAIN =================
-from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, filters
-
-# ... your imports, Firebase setup, handlers etc ...
-
 if __name__ == "__main__":
     application = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    # Register handlers
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CallbackQueryHandler(callbacks))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, messages))
@@ -213,5 +208,3 @@ if __name__ == "__main__":
         url_path=BOT_TOKEN,
         webhook_url=f"https://tonalt-bot.onrender.com/{BOT_TOKEN}"
     )
-
-
